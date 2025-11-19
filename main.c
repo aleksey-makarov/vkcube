@@ -578,11 +578,17 @@ init_vt(struct vkcube *vc)
     * fails to get drm master. */
    struct vt_mode mode = { .mode = VT_PROCESS, .relsig = 0, .acqsig = 0 };
    ret = ioctl(STDIN_FILENO, VT_SETMODE, &mode);
-   fail_if(ret == -1, "failed to take control of vt handling\n");
+   if(ret == -1) {
+      fprintf(stderr, "failed to take control of vt handling\n");
+      return ret;
+   }
 
    /* Set KD_GRAPHICS to disable fbcon while we render. */
    ret = ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS);
-   fail_if(ret == -1, "failed to switch console to graphics mode\n");
+   if(ret == -1) {
+      fprintf(stderr, "failed to switch console to graphics mode\n");
+      return ret;
+   }
 
    return 0;
 }
@@ -728,8 +734,9 @@ init_kms(struct vkcube *vc)
    drmModeEncoder *encoder;
    int i;
 
-   if (init_vt(vc) == -1)
-      return -1;
+   if (init_vt(vc) == -1) {
+      fprintf(stderr, "init_vt() failed\n");
+   }
 
    vc->fd = open("/dev/dri/card0", O_RDWR);
    fail_if(vc->fd == -1, "failed to open /dev/dri/card0\n");
