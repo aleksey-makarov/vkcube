@@ -156,7 +156,7 @@ static int find_image_memory(struct vkcube *vc, unsigned allowed)
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
       (vc->protected ? VK_MEMORY_PROPERTY_PROTECTED_BIT : 0);
 
-    for (unsigned i = 0; (1u << i) <= allowed && i <= vc->memory_properties.memoryTypeCount; ++i) {
+    for (unsigned i = 0; (1u << i) <= allowed && i < vc->memory_properties.memoryTypeCount; ++i) {
         if ((allowed & (1u << i)) && (vc->memory_properties.memoryTypes[i].propertyFlags & flags))
             return i;
     }
