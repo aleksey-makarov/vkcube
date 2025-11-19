@@ -218,7 +218,7 @@ init_vk_ext(struct vkcube *vc, const char *extension,
    vkGetPhysicalDeviceQueueFamilyProperties(vc->physical_device, &count, props);
    assert(props[0].queueFlags & VK_QUEUE_GRAPHICS_BIT);
 
-   vkCreateDevice(vc->physical_device,
+   res = vkCreateDevice(vc->physical_device,
                   &(VkDeviceCreateInfo) {
                      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
                      .queueCreateInfoCount = 1,
@@ -234,6 +234,7 @@ init_vk_ext(struct vkcube *vc, const char *extension,
                   },
                   NULL,
                   &vc->device);
+   fail_if(res != VK_SUCCESS, "vkCreateDevice failed (%d)", res);
 
    vkGetDeviceQueue2(vc->device, &(VkDeviceQueueInfo2) {
          .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
