@@ -165,7 +165,7 @@ static int find_image_memory(struct vkcube *vc, unsigned allowed)
 
 static void
 init_vk_ext(struct vkcube *vc, const char *extension,
-    int num_device_extensions, const char * const device_extensions[])
+    int required_extensions_length, const char * const required_extensions[])
 {
    VkResult res = vkCreateInstance(&(VkInstanceCreateInfo) {
          .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -218,6 +218,34 @@ init_vk_ext(struct vkcube *vc, const char *extension,
    vkGetPhysicalDeviceQueueFamilyProperties(vc->physical_device, &count, props);
    assert(props[0].queueFlags & VK_QUEUE_GRAPHICS_BIT);
 
+   const char * supported_extensions[required_extensions_length];
+   unsigned int supported_extensions_length = 0;
+
+   uint32_t extCount = 0;
+   vkEnumerateDeviceExtensionProperties(vc->physical_device, NULL, &extCount, NULL);
+   VkExtensionProperties *exts = malloc(extCount * sizeof *exts);
+   fail_if(!exts, "out of memory");
+   vkEnumerateDeviceExtensionProperties(vc->physical_device, NULL, &extCount, exts);
+
+   for (size_t i = 0; i < required_extensions_length; i++) {
+      uint32_t j;
+      for (j = 0; j < extCount; ++j) {
+         if (strcmp(required_extensions[i], exts[j].extensionName) == 0) {
+            supported_extensions[supported_extensions_length++] = required_extensions[i];
+            break;
+         }
+      }
+      if (j >= extCount) {
+         printf("%s is not supported\n", required_extensions[i]);
+      }
+   }
+   free(exts);
+
+   printf("requesting extensions:\n");
+   for (size_t i = 0; i < supported_extensions_length; i++) {
+       printf("%s\n", supported_extensions[i]);
+   }
+
    res = vkCreateDevice(vc->physical_device,
                   &(VkDeviceCreateInfo) {
                      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -229,8 +257,8 @@ init_vk_ext(struct vkcube *vc, const char *extension,
                         .flags = vc->protected ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0,
                         .pQueuePriorities = (float []) { 1.0f },
                      },
-                     .enabledExtensionCount = num_device_extensions,
-                     .ppEnabledExtensionNames = device_extensions,
+                     .enabledExtensionCount = supported_extensions_length,
+                     .ppEnabledExtensionNames = supported_extensions,
                   },
                   NULL,
                   &vc->device);
@@ -741,11 +769,6 @@ init_kms(struct vkcube *vc)
            VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
    };
    const unsigned int required_extensions_length = sizeof(required_extensions)/sizeof(required_extensions[0]);
-
-   printf("requesting extensions:\n");
-   for (i = 0; i < required_extensions_length; i++) {
-     printf("%s\n", required_extensions[i]);
-   }
 
    init_vk_ext(vc, NULL, required_extensions_length, required_extensions);
 
