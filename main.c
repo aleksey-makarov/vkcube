@@ -740,10 +740,14 @@ init_kms(struct vkcube *vc)
            VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
            VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
    };
+   const unsigned int required_extensions_length = sizeof(required_extensions)/sizeof(required_extensions[0]);
 
-   init_vk_ext(vc, NULL,
-      sizeof(required_extensions)/sizeof(required_extensions[0]),
-      required_extensions);
+   printf("requesting extensions:\n");
+   for (i = 0; i < required_extensions_length; i++) {
+     printf("%s\n", required_extensions[i]);
+   }
+
+   init_vk_ext(vc, NULL, required_extensions_length, required_extensions);
 
    vc->image_format = VK_FORMAT_R8G8B8A8_SRGB;
    init_vk_objects(vc);
