@@ -603,6 +603,14 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
                                              drm_format, &drm_format_mod, 1,
                                              GBM_BO_USE_RENDERING);
 
+   if (!b->gbm_bo) {
+      fprintf(stderr, "DEBUG:%d gbm_bo_create_with_modifiers2() failed\n", __LINE__);
+      /* Фоллбэк: без модификаторов (линейная раскладка) */
+      b->gbm_bo = gbm_bo_create(vc->gbm_device, vc->width, vc->height,
+                              drm_format, GBM_BO_USE_RENDERING | GBM_BO_USE_SCANOUT);
+      fail_if(!b->gbm_bo, "gbm_bo_create failed");
+   }
+
    int fd = gbm_bo_get_fd(b->gbm_bo);
    fail_if(fd < 0, "failed to get prime fd for gbm_bo");
 
