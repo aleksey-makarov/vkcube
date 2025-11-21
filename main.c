@@ -107,6 +107,20 @@ static uint32_t width = 1024, height = 768;
 static const char *arg_out_file = "./cube.png";
 static bool protected_chain = false;
 
+#define pr( ch, format, ... ) \
+    fprintf(stderr, "%c %s():%d : " format "\n", ch, __func__, __LINE__, ##__VA_ARGS__)
+
+#define pr_info( format, ... ) \
+    pr('-', format,  ##__VA_ARGS__)
+
+#define pr_err( format, ... ) \
+    pr('*', format,  ##__VA_ARGS__)
+
+#define pr_die( format, ... ) do {   \
+    pr('!', format,  ##__VA_ARGS__); \
+    exit(1);                         \
+} while(0)
+
 void noreturn
 failv(const char *format, va_list args)
 {
@@ -599,24 +613,28 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
 {
    VkResult res;
 
+   pr_info("gbm_bo_create_with_modifiers2()");
    b->gbm_bo = gbm_bo_create_with_modifiers2(vc->gbm_device, vc->width, vc->height,
                                              drm_format, &drm_format_mod, 1,
                                              GBM_BO_USE_RENDERING);
 
    if (!b->gbm_bo) {
-      fprintf(stderr, "DEBUG:%d gbm_bo_create_with_modifiers2() failed\n", __LINE__);
+      pr_err("gbm_bo_create_with_modifiers2()");
       /* Фоллбэк: без модификаторов (линейная раскладка) */
+      pr_info("gbm_bo_create()");
       b->gbm_bo = gbm_bo_create(vc->gbm_device, vc->width, vc->height,
                               drm_format, GBM_BO_USE_RENDERING | GBM_BO_USE_SCANOUT);
       fail_if(!b->gbm_bo, "gbm_bo_create failed");
    }
 
+   pr_info("gbm_bo_get_fd()");
    int fd = gbm_bo_get_fd(b->gbm_bo);
    fail_if(fd < 0, "failed to get prime fd for gbm_bo");
 
    VkExternalImageFormatProperties external_image_format_props = {
       .sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES,
    };
+   pr_info("vkGetPhysicalDeviceImageFormatProperties2()");
    res = vkGetPhysicalDeviceImageFormatProperties2(vc->physical_device,
                                                    &(VkPhysicalDeviceImageFormatInfo2) {
                                                       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
@@ -678,10 +696,12 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
    };
 
+   pr_info("vkCreateImage()");
    res = vkCreateImage(vc->device, &base_create_info,
                        NULL, &b->image);
    fail_if(res != VK_SUCCESS, "failed to create image");
 
+   pr_info("vkGetDeviceProcAddr(\"vkGetMemoryFdPropertiesKHR\")");
    PFN_vkGetMemoryFdPropertiesKHR getMemoryFdPropertiesKHR =
       (void *)vkGetDeviceProcAddr(vc->device, "vkGetMemoryFdPropertiesKHR");
    fail_if(getMemoryFdPropertiesKHR == NULL,
@@ -690,6 +710,7 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
    VkMemoryFdPropertiesKHR fd_props = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
    };
+   pr_info("getMemoryFdPropertiesKHR(VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR)");
    getMemoryFdPropertiesKHR(vc->device,
                             VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
                             fd, &fd_props);
@@ -697,6 +718,7 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
    VkMemoryRequirements2 mem_reqs = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
    };
+   pr_info("vkGetImageMemoryRequirements2(VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2)");
    vkGetImageMemoryRequirements2(vc->device,
                                  &(VkImageMemoryRequirementsInfo2) {
                                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
@@ -707,6 +729,7 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
       mem_reqs.memoryRequirements.memoryTypeBits;
    fail_if(!memory_type_bits, "no valid memory type");
 
+   pr_info("vkAllocateMemory()");
    res = vkAllocateMemory(vc->device,
                           &(VkMemoryAllocateInfo) {
                              .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -725,6 +748,7 @@ create_drm_image(struct vkcube *vc, struct vkcube_buffer *b,
                           NULL, &b->mem);
    fail_if(res != VK_SUCCESS, "vkAllocateMemory");
 
+   pr_info("vkBindImageMemory()");
    res = vkBindImageMemory(vc->device, b->image, b->mem, 0);
    fail_if(res != VK_SUCCESS, "vkBindImageMemory");
 
@@ -742,10 +766,12 @@ init_kms(struct vkcube *vc)
    drmModeEncoder *encoder;
    int i;
 
+   pr_info("init_vt()");
    if (init_vt(vc) == -1) {
       fprintf(stderr, "init_vt() failed\n");
    }
 
+   pr_info("open(\"/dev/dri/card0\")");
    vc->fd = open("/dev/dri/card0", O_RDWR);
    fail_if(vc->fd == -1, "failed to open /dev/dri/card0\n");
 
@@ -785,12 +811,14 @@ init_kms(struct vkcube *vc)
    };
    const unsigned int required_extensions_length = sizeof(required_extensions)/sizeof(required_extensions[0]);
 
+   pr_info("init_vk_ext()");
    init_vk_ext(vc, NULL, required_extensions_length, required_extensions);
 
    // vc->image_format = VK_FORMAT_R8G8B8A8_SRGB;
    vc->image_format = VK_FORMAT_B8G8R8A8_UNORM;
    init_vk_objects(vc);
 
+   pr_info("create buffers");
    for (uint32_t i = 0; i < 2; i++) {
       struct vkcube_buffer *b = &vc->buffers[i];
       int stride, ret;
@@ -798,9 +826,11 @@ init_kms(struct vkcube *vc)
       const uint64_t drm_format = DRM_FORMAT_ARGB8888;
       const uint64_t drm_format_mod = DRM_FORMAT_MOD_LINEAR;
 
+      pr_info("%d create_drm_image()", i);
       ret = create_drm_image(vc, b, drm_format, drm_format_mod);
       fail_if(ret == -1, "create_drm_image failed");
 
+      pr_info("%d gbm_bo_get_stride()", i);
       stride = gbm_bo_get_stride(b->gbm_bo);
 
       b->stride = gbm_bo_get_stride(b->gbm_bo);
@@ -808,6 +838,7 @@ init_kms(struct vkcube *vc)
       uint32_t pitches[4] = { stride, };
       uint32_t offsets[4] = { 0, };
       uint64_t modifiers[4] = { drm_format_mod, };
+      pr_info("%d drmModeAddFB2WithModifiers()", i);
       ret = drmModeAddFB2WithModifiers(vc->fd, vc->width, vc->height,
                                        drm_format, bo_handles,
                                        pitches, offsets, modifiers, &b->fb, 0);
@@ -815,6 +846,7 @@ init_kms(struct vkcube *vc)
 
       init_buffer(vc, b);
    }
+   pr_info("create buffers done");
 
    return 0;
 }
@@ -1938,6 +1970,7 @@ init_display(struct vkcube *vc)
          fail("fail to initialize khr");
       break;
    case DISPLAY_MODE_KMS:
+      pr_info("init_kms()");
       if (init_kms(vc) == -1)
          fail("failed to initialize kms");
       break;
@@ -1991,7 +2024,9 @@ int main(int argc, char *argv[])
 {
    struct vkcube vc;
 
+   pr_info("parse args");
    parse_args(argc, argv);
+
 
    vc.model = cube_model;
    vc.gbm_device = NULL;
@@ -2006,7 +2041,10 @@ int main(int argc, char *argv[])
    vc.protected = protected_chain;
    gettimeofday(&vc.start_tv, NULL);
 
+   pr_info("init display");
    init_display(&vc);
+
+   pr_info("enter the loop");
    mainloop(&vc);
 
    return 0;
