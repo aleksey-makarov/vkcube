@@ -779,13 +779,15 @@ init_kms(struct vkcube *vc)
 
    init_vk_ext(vc, NULL, required_extensions_length, required_extensions);
 
-   vc->image_format = VK_FORMAT_R8G8B8A8_SRGB;
+   // vc->image_format = VK_FORMAT_R8G8B8A8_SRGB;
+   vc->image_format = VK_FORMAT_B8G8R8A8_UNORM;
    init_vk_objects(vc);
 
    for (uint32_t i = 0; i < 2; i++) {
       struct vkcube_buffer *b = &vc->buffers[i];
       int stride, ret;
-      const uint64_t drm_format = DRM_FORMAT_XRGB8888;
+      // const uint64_t drm_format = DRM_FORMAT_XRGB8888;
+      const uint64_t drm_format = DRM_FORMAT_ARGB8888;
       const uint64_t drm_format_mod = DRM_FORMAT_MOD_LINEAR;
 
       ret = create_drm_image(vc, b, drm_format, drm_format_mod);
